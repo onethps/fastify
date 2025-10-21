@@ -1,7 +1,3 @@
-/**
- * Tournament Manager - управління турнірами
- */
-
 import { Server as SocketServer } from "socket.io";
 import { EventEmitter } from "events";
 import {
@@ -33,31 +29,24 @@ export class TournamentManager extends EventEmitter {
     });
   }
 
-  /**
-   * Handle room completion - called by RoomManager
-   */
   async handleRoomCompleted(roomId: string): Promise<void> {
     console.log(`[TOURNAMENT STATUS] Room ${roomId} completed`);
 
-    // Get the room to find its round
     const room = await this.getRoom(roomId);
     if (!room) {
       console.error(`[TOURNAMENT STATUS] Room ${roomId} not found`);
       return;
     }
 
-    // Check if all rooms in the round are completed
     const round = await this.getRound(room.roundId);
     if (!round) {
       console.error(`[TOURNAMENT STATUS] Round ${room.roundId} not found`);
       return;
     }
 
-    // Notify all participants in this room that they need to wait for round completion
     for (const participantId of room.participantIds) {
       this.io.emit("round:waiting_for_completion", round.id, participantId);
 
-      // Update participant status to waiting
       this.io.emit(
         "participant:status_changed",
         roomId,
@@ -66,7 +55,6 @@ export class TournamentManager extends EventEmitter {
       );
     }
 
-    // Check if all rooms in this round are completed
     const allRoomsCompleted = await this.checkAllRoomsCompleted(round.id);
 
     if (allRoomsCompleted) {
@@ -77,9 +65,6 @@ export class TournamentManager extends EventEmitter {
     }
   }
 
-  /**
-   * Check if all rooms in a round are completed and have winners
-   */
   private async checkAllRoomsCompleted(roundId: string): Promise<boolean> {
     const round = await this.getRound(roundId);
     if (!round) return false;
@@ -93,7 +78,6 @@ export class TournamentManager extends EventEmitter {
         return false;
       }
 
-      // Check if room has winners
       if (!room.winners || room.winners.length === 0) {
         console.log(
           `[TOURNAMENT STATUS] Room ${roomId} completed but has no winners`
@@ -108,9 +92,6 @@ export class TournamentManager extends EventEmitter {
     return true;
   }
 
-  /**
-   * Get room by ID
-   */
   private async getRoom(id: string): Promise<TournamentRoom | null> {
     const doc = await this.firestore
       .collection(FIRESTORE_COLLECTIONS.ROOMS)
@@ -120,9 +101,6 @@ export class TournamentManager extends EventEmitter {
     return doc.exists ? (doc.data() as TournamentRoom) : null;
   }
 
-  /**
-   * Створення нового турніру
-   */
   async createTournament(data: {
     name: string;
     description?: string;
@@ -131,7 +109,7 @@ export class TournamentManager extends EventEmitter {
     performanceTimeSeconds?: number;
     votingTimeSeconds?: number;
     advancePerRoom?: number;
-    startAt?: number; // Unix timestamp в секундах
+    startAt?: number;
   }): Promise<Tournament> {
     const tournament: Tournament = {
       id: this.generateId(),
@@ -142,10 +120,10 @@ export class TournamentManager extends EventEmitter {
       maxParticipantsPerRoom: data.maxParticipantsPerRoom || 5,
       performanceTimeSeconds: data.performanceTimeSeconds || 60,
       votingTimeSeconds: data.votingTimeSeconds || 60,
-      advancePerRoom: data.advancePerRoom || 2, // 2 з 5 проходять далі
+      advancePerRoom: data.advancePerRoom || 2,
 
       currentRound: 0,
-      totalRounds: 0, // розрахується після реєстрації
+      totalRounds: 0,
       participants: [],
 
       createdBy: data.createdBy,
@@ -153,13 +131,11 @@ export class TournamentManager extends EventEmitter {
       ...(data.startAt && { startAt: data.startAt }),
     };
 
-    // Зберігаємо в Firestore
     await this.firestore
       .collection(FIRESTORE_COLLECTIONS.TOURNAMENTS)
       .doc(tournament.id)
       .set(tournament);
 
-    // Broadcast подію
     this.io.emit("tournament:created", tournament);
 
     console.log(
@@ -168,9 +144,6 @@ export class TournamentManager extends EventEmitter {
     return tournament;
   }
 
-  /**
-   * Реєстрація учасника в турнірі
-   */
   async registerParticipant(
     tournamentId: string,
     userId: string
@@ -188,31 +161,24 @@ export class TournamentManager extends EventEmitter {
       throw new Error("Tournament registration is closed");
     }
 
-    // Перевірка чи учасник вже зареєстрований
     if (tournament.participants.includes(userId)) {
       return false;
     }
 
-    // Додаємо учасника
     tournament.participants.push(userId);
     tournament.status = TournamentStatus.REGISTRATION;
 
-    // Оновлюємо в базі
     await this.updateTournament(tournament);
 
     console.log(
       `[TOURNAMENT STATUS] User ${userId} registered for tournament ${tournamentId}`
     );
 
-    // Broadcast подію
     this.io.emit("tournament:participant_registered", tournamentId, userId);
 
     return true;
   }
 
-  /**
-   * Початок турніру
-   */
   async startTournament(tournamentId: string): Promise<void> {
     console.log("startTournament");
 
@@ -226,7 +192,6 @@ export class TournamentManager extends EventEmitter {
       throw new Error("Tournament already started");
     }
 
-    // Get only connected participants
     const connectedParticipants = await this.getConnectedUsersForTournament(
       tournamentId
     );
@@ -235,7 +200,6 @@ export class TournamentManager extends EventEmitter {
       throw new Error("Not enough connected participants");
     }
 
-    // Update tournament participants to only include connected users
     tournament.participants = connectedParticipants;
 
     tournament.status = TournamentStatus.IN_PROGRESS;
@@ -245,31 +209,14 @@ export class TournamentManager extends EventEmitter {
 
     await this.updateTournament(tournament);
 
-    // Створюємо перший раунд
     await this.createRound(tournament);
 
     this.io.emit("tournament:started", tournamentId);
   }
 
-  // async prepareTournament(tournamentId: string): Promise<void> {
-  //   const tournament = await this.getTournament(tournamentId);
-  //   if (!tournament) {
-  //     throw new Error("Tournament not found");
-  //   }
-
-  //   tournament.status = TournamentStatus.PREPARING;
-  //   await this.updateTournament(tournament);
-
-  //   this.io.emit("tournament:preparing", tournamentId);
-  // }
-
-  /**
-   * Створення раунду
-   */
   async createRound(tournament: Tournament): Promise<TournamentRound> {
     const roundNumber = tournament.currentRound;
 
-    // Отримуємо учасників для цього раунду
     const participants = await this.getRoundParticipants(
       tournament,
       roundNumber
@@ -285,13 +232,11 @@ export class TournamentManager extends EventEmitter {
       startedAt: new Date(),
     };
 
-    // Зберігаємо раунд
     await this.firestore
       .collection(FIRESTORE_COLLECTIONS.ROUNDS)
       .doc(round.id)
       .set(round);
 
-    // Створюємо кімнати для раунду
     const rooms = await this.createRoomsForRound(
       tournament,
       round,
@@ -300,13 +245,11 @@ export class TournamentManager extends EventEmitter {
 
     round.rooms = rooms;
 
-    // Оновлюємо раунд з кімнатами
     await this.firestore
       .collection(FIRESTORE_COLLECTIONS.ROUNDS)
       .doc(round.id)
       .update({ rooms: rooms.map((r) => r.id) });
 
-    // Запускаємо раунд
     await this.startRound(round.id);
 
     return round;
@@ -322,10 +265,8 @@ export class TournamentManager extends EventEmitter {
 
     console.log("createRoomsForRound");
 
-    // Перемішуємо учасників для рандомного розподілу
     const shuffled = this.shuffleArray([...participants]);
 
-    // Розбиваємо на групи
     let roomNumber = 1;
     for (let i = 0; i < shuffled.length; i += maxPerRoom) {
       const roomParticipants = shuffled.slice(i, i + maxPerRoom);
@@ -364,7 +305,6 @@ export class TournamentManager extends EventEmitter {
 
       room.timer.roomId = room.id;
 
-      // Зберігаємо кімнату
       await this.firestore
         .collection(FIRESTORE_COLLECTIONS.ROOMS)
         .doc(room.id)
@@ -373,7 +313,6 @@ export class TournamentManager extends EventEmitter {
       rooms.push(room);
       roomNumber++;
 
-      // Broadcast подію про створення кімнати
       this.io.emit("room:created", room);
     }
 
@@ -382,9 +321,6 @@ export class TournamentManager extends EventEmitter {
     return rooms;
   }
 
-  /**
-   * Запуск раунду - всі кімнати починають одночасно
-   */
   async startRound(roundId: string): Promise<void> {
     const round = await this.getRound(roundId);
 
@@ -404,23 +340,17 @@ export class TournamentManager extends EventEmitter {
       .update({ status: RoundStatus.IN_PROGRESS });
 
     this.io.emit("round:started", round);
-
-    // Запускаємо всі кімнати
     const roomIds = round.rooms.map((r) => (typeof r === "string" ? r : r.id));
 
     console.log("[TOURNAMENT STATUS] Room IDs to start:", roomIds);
 
     for (const roomId of roomIds) {
       console.log(`[TOURNAMENT STATUS] Starting room ${roomId}`);
-      // RoomManager буде обробляти це
       this.io.to(roomId).emit("room:stage_changed", roomId, "performance");
       this.roomManager.startRoom(roomId);
     }
   }
 
-  /**
-   * Завершення раунду та перехід до наступного
-   */
   async completeRound(roundId: string): Promise<void> {
     console.log(`[TOURNAMENT STATUS] Completing round ${roundId}`);
 
@@ -445,7 +375,6 @@ export class TournamentManager extends EventEmitter {
     this.io.emit("round:completed", roundId);
     this.io.emit("round:all_rooms_completed", roundId);
 
-    // Отримуємо переможців з усіх кімнат
     const winners = await this.getRoundWinners(roundId);
     console.log(
       `[TOURNAMENT STATUS] Round ${roundId} winners: ${winners.join(", ")}`
@@ -457,16 +386,12 @@ export class TournamentManager extends EventEmitter {
       throw new Error("Tournament not found");
     }
 
-    // Notify all participants about their status
     await this.notifyParticipantsOfRoundCompletion(round, winners);
 
-    // Перевіряємо чи це був фінальний раунд
     if (winners.length <= 1) {
-      // Tournament completed
       if (winners.length === 1 && winners[0]) {
         await this.completeTournament(tournament.id, winners[0]);
       } else {
-        // No winners - tournament cancelled
         tournament.status = TournamentStatus.CANCELLED;
         await this.updateTournament(tournament);
         this.io.emit("tournament:cancelled", tournament.id);
@@ -474,23 +399,19 @@ export class TournamentManager extends EventEmitter {
       return;
     }
 
-    // Переходимо до наступного раунду
     console.log(
       `[TOURNAMENT STATUS] Creating next round for tournament ${tournament.id}`
     );
     tournament.currentRound++;
     await this.updateTournament(tournament);
 
-    // Small delay to ensure all room data is fully persisted
     await new Promise((resolve) => setTimeout(resolve, 100));
 
     const nextRound = await this.createRound(tournament);
 
-    // Notify all participants that the next round is ready
     console.log(`[ROUND STATUS] Next round ${nextRound.id} is ready`);
     this.io.emit("round:next_ready", roundId, nextRound.id);
 
-    // Notify winners about advancing to next round
     for (const winnerId of winners) {
       this.io.emit(
         "round:participant_advances",
@@ -501,16 +422,12 @@ export class TournamentManager extends EventEmitter {
     }
   }
 
-  /**
-   * Notify all participants about round completion status
-   */
   private async notifyParticipantsOfRoundCompletion(
     round: TournamentRound,
     winners: string[]
   ): Promise<void> {
     const winnerSet = new Set(winners);
 
-    // Get all participants from all rooms in this round
     const allParticipants = new Set<string>();
     for (const roomId of round.rooms.map((r) =>
       typeof r === "string" ? r : r.id
@@ -521,10 +438,8 @@ export class TournamentManager extends EventEmitter {
       }
     }
 
-    // Notify each participant about their status
     for (const participantId of allParticipants) {
       if (winnerSet.has(participantId)) {
-        // Winner - will advance to next round
         this.io.emit(
           "round:participant_advances",
           round.id,
@@ -532,15 +447,11 @@ export class TournamentManager extends EventEmitter {
           "next_round"
         );
       } else {
-        // Eliminated
         this.io.emit("round:participant_eliminated", round.id, participantId);
       }
     }
   }
 
-  /**
-   * Завершення турніру
-   */
   async completeTournament(
     tournamentId: string,
     winnerId: string
@@ -566,10 +477,6 @@ export class TournamentManager extends EventEmitter {
     );
     this.io.emit("tournament:completed", tournamentId, winnerId);
   }
-
-  // ============================================
-  // Helper methods
-  // ============================================
 
   async getTournament(id: string): Promise<Tournament | null> {
     const doc = await this.firestore
@@ -629,13 +536,10 @@ export class TournamentManager extends EventEmitter {
       );
       return tournament.participants;
     }
-
-    // Для наступних раундів отримуємо переможців попереднього раунду
     console.log(
       `[TOURNAMENT STATUS] Getting participants for round ${roundNumber}`
     );
 
-    // Отримуємо попередній раунд
     const previousRound = await this.getRoundByNumber(
       tournament.id,
       roundNumber - 1
@@ -647,7 +551,6 @@ export class TournamentManager extends EventEmitter {
       return [];
     }
 
-    // Отримуємо переможців з попереднього раунду
     console.log(
       `[TOURNAMENT DEBUG] Getting winners from previous round ${previousRound.id}`
     );
@@ -670,7 +573,6 @@ export class TournamentManager extends EventEmitter {
   }
 
   private async getRoundWinners(roundId: string): Promise<string[]> {
-    // Отримуємо переможців з усіх кімнат раунду
     const round = await this.getRound(roundId);
     if (!round) {
       console.error(
@@ -717,7 +619,6 @@ export class TournamentManager extends EventEmitter {
   }
 
   async startTimer(tournamentId: string): Promise<void> {
-    // Очищаємо попередній таймер якщо він існує
     this.stopTimer(tournamentId);
 
     const interval = setInterval(async () => {
@@ -735,30 +636,24 @@ export class TournamentManager extends EventEmitter {
         return;
       }
 
-      // Обчислюємо залишок часу до початку турніру
-      // startAt зберігається у секундах (Unix timestamp)
       const nowInSeconds = Math.floor(Date.now() / 1000);
 
-      //ff
-      const FIVE_MINUTES_IN_SECONDS = 10 * 20; // 20 minutes
+      const FIVE_MINUTES_IN_SECONDS = 10 * 20;
       const timeLeft = Math.max(
         0,
         tournament.startAt + FIVE_MINUTES_IN_SECONDS - nowInSeconds
       );
 
-      // Broadcast тік таймера з часом у секундах
       this.io
         .to(`tournament:${tournamentId}`)
         .emit("tournament:start:timer:tick", tournamentId, timeLeft);
 
       console.log(`Timer tick for ${tournamentId}: ${timeLeft}s remaining`);
 
-      // Перевірка завершення
       if (timeLeft <= 0) {
         console.log("Tournament timer completed");
         this.stopTimer(tournamentId);
 
-        // Автоматично запускаємо турнір
         try {
           await this.startTournament(tournamentId);
           this.io
@@ -774,9 +669,6 @@ export class TournamentManager extends EventEmitter {
     this.activeTimers.set(tournamentId, interval);
   }
 
-  /**
-   * Зупинка таймера турніру
-   */
   stopTimer(tournamentId: string): void {
     const timer = this.activeTimers.get(tournamentId);
     if (timer) {
@@ -803,9 +695,6 @@ export class TournamentManager extends EventEmitter {
     return `${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
   }
 
-  /**
-   * Add connected user
-   */
   addConnectedUser(userId: string): void {
     this.connectedUsers.add(userId);
     console.log(
@@ -813,9 +702,6 @@ export class TournamentManager extends EventEmitter {
     );
   }
 
-  /**
-   * Remove disconnected user
-   */
   removeConnectedUser(userId: string): void {
     this.connectedUsers.delete(userId);
     console.log(
@@ -823,35 +709,24 @@ export class TournamentManager extends EventEmitter {
     );
   }
 
-  /**
-   * Get connected users for a tournament
-   */
   async getConnectedUsersForTournament(
     tournamentId: string
   ): Promise<string[]> {
     const tournament = await this.getTournament(tournamentId);
     if (!tournament) return [];
 
-    // Return only participants who are currently connected
     return tournament.participants.filter((participantId) =>
       this.connectedUsers.has(participantId)
     );
   }
 
-  /**
-   * Check if user is connected
-   */
   isUserConnected(userId: string): boolean {
     return this.connectedUsers.has(userId);
   }
 
-  /**
-   * Handle user disconnection during tournament
-   */
   async handleUserDisconnection(userId: string): Promise<void> {
     console.log(`[DISCONNECTION] Handling disconnection for user ${userId}`);
 
-    // Find all active rooms where this user is participating
     const activeRooms = await this.findUserActiveRooms(userId);
 
     for (const roomId of activeRooms) {
@@ -859,21 +734,15 @@ export class TournamentManager extends EventEmitter {
         `[DISCONNECTION] Removing user ${userId} from room ${roomId}`
       );
 
-      // Notify room participants about the disconnection
       this.io.to(roomId).emit("participant:disconnected", roomId, userId);
 
-      // Update room status if needed
       await this.handleRoomParticipantDisconnection(roomId, userId);
     }
   }
 
-  /**
-   * Find all active rooms where user is participating
-   */
   private async findUserActiveRooms(userId: string): Promise<string[]> {
     const activeRooms: string[] = [];
 
-    // Query all active rounds
     const roundsSnapshot = await this.firestore
       .collection(FIRESTORE_COLLECTIONS.ROUNDS)
       .where("status", "==", RoundStatus.IN_PROGRESS)
@@ -882,7 +751,6 @@ export class TournamentManager extends EventEmitter {
     for (const roundDoc of roundsSnapshot.docs) {
       const round = roundDoc.data() as TournamentRound;
 
-      // Check each room in the round
       for (const roomId of round.rooms.map((r) =>
         typeof r === "string" ? r : r.id
       )) {
@@ -896,9 +764,6 @@ export class TournamentManager extends EventEmitter {
     return activeRooms;
   }
 
-  /**
-   * Handle participant disconnection in a specific room
-   */
   private async handleRoomParticipantDisconnection(
     roomId: string,
     userId: string
@@ -906,13 +771,10 @@ export class TournamentManager extends EventEmitter {
     const room = await this.getRoom(roomId);
     if (!room) return;
 
-    // Remove user from participant list
     room.participantIds = room.participantIds.filter((id) => id !== userId);
 
-    // Remove from performance order
     room.performanceOrder = room.performanceOrder.filter((id) => id !== userId);
 
-    // Update current performer if needed
     if (room.currentPerformerId === userId) {
       const currentIndex = room.performanceOrder.findIndex(
         (id) => id === userId
@@ -927,19 +789,16 @@ export class TournamentManager extends EventEmitter {
           room.currentPerformanceIndex = currentIndex + 1;
         }
       } else {
-        // No more performers, end the room
         room.status = "completed" as any;
         room.winners = [];
       }
     }
 
-    // Update room in database
     await this.firestore
       .collection(FIRESTORE_COLLECTIONS.ROOMS)
       .doc(roomId)
       .update(room);
 
-    // If room has no more participants, mark it as completed
     if (room.participantIds.length === 0) {
       this.emit("room:completed", roomId);
     }
