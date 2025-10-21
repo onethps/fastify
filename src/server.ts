@@ -1,4 +1,3 @@
-
 import Fastify from "fastify";
 import fastifyIO from "fastify-socket.io";
 import { SERVER_CONFIG, LOG_LEVEL, SERVER_INFO } from "./config.js";
