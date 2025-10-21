@@ -63,3 +63,19 @@ test/types/index.js
 
 # compiled app
 dist
+
+# Environment variables and secrets
+.env
+.env.local
+.env.production
+.env.development
+*.env
+
+# Service account keys and credentials
+src/serviceAccountKey.json
+**/serviceAccountKey.json
+**/*service-account*.json
+**/*credentials*.json
+firebase-adminsdk-*.json
+
+tournament-example
