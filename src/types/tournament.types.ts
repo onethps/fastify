@@ -183,6 +183,7 @@ export interface SocketEvents {
   "round:completed": (roundId: string) => void;
 
   "room:created": (room: TournamentRoom) => void;
+  "room:assigned": (room: TournamentRoom) => void;
   "room:stage_changed": (roomId: string, stage: RoomStage) => void;
   "room:participants_assigned": (
     roomId: string,

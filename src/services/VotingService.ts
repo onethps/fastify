@@ -23,6 +23,10 @@ export class VotingService {
 
     if (!room) throw new Error("Room not found");
 
+    // Get tournament to access votingTimeSeconds
+    const tournament = await this.roomService.getTournament(room.tournamentId);
+    if (!tournament) throw new Error("Tournament not found");
+
     console.log(
       `[ROOM STATUS] Room ${roomId}: ${room.status} -> ${RoomStage.VOTING}`
     );
@@ -32,8 +36,8 @@ export class VotingService {
       id: this.roomService.generateId(),
       roomId: room.id,
       type: "voting",
-      duration: room.timer.duration,
-      remaining: room.timer.duration,
+      duration: tournament.votingTimeSeconds,
+      remaining: tournament.votingTimeSeconds,
       isRunning: true,
       isPaused: false,
       startedAt: new Date(),

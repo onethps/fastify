@@ -119,7 +119,7 @@ export class TournamentManager extends EventEmitter {
 
       maxParticipantsPerRoom: data.maxParticipantsPerRoom || 5,
       performanceTimeSeconds: data.performanceTimeSeconds || 60,
-      votingTimeSeconds: data.votingTimeSeconds || 60,
+      votingTimeSeconds: data.votingTimeSeconds || 20,
       advancePerRoom: data.advancePerRoom || 2,
 
       currentRound: 0,
@@ -180,8 +180,6 @@ export class TournamentManager extends EventEmitter {
   }
 
   async startTournament(tournamentId: string): Promise<void> {
-    console.log("startTournament");
-
     const tournament = await this.getTournament(tournamentId);
 
     if (!tournament) {
@@ -314,6 +312,28 @@ export class TournamentManager extends EventEmitter {
       roomNumber++;
 
       this.io.emit("room:created", room);
+
+      // Auto-join participants to their assigned room
+      for (const participantId of roomParticipants) {
+        console.log(
+          `[ROOM AUTO-JOIN] Auto-joining participant ${participantId} to room ${room.id}`
+        );
+        this.io.to(`user:${participantId}`).emit("room:assigned", room);
+
+        // Automatically join the participant to the room
+        try {
+          await this.roomManager.joinRoom(
+            room.id,
+            participantId,
+            `auto-${participantId}`
+          );
+        } catch (error) {
+          console.error(
+            `[ROOM AUTO-JOIN ERROR] Failed to auto-join ${participantId} to room ${room.id}:`,
+            error
+          );
+        }
+      }
     }
 
     console.log("after createRoomsForRound");

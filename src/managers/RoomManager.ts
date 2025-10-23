@@ -257,6 +257,10 @@ export class RoomManager extends EventEmitter {
     return await this.roomService.getRoomByUserId(userId);
   }
 
+  async getRoom(roomId: string): Promise<any> {
+    return await this.roomService.getRoom(roomId);
+  }
+
   cleanup(): void {
     this.timerService.cleanup();
   }

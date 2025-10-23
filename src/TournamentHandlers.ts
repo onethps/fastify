@@ -27,6 +27,7 @@ export class TournamentSocketHandlers {
         await this.tournamentManager.startTimer(tournamentId);
 
         socket.join(`tournament:${tournamentId}`);
+        socket.join(`user:${userId}`); // Join user to their personal room for targeted events
 
         callback(true);
       } catch (error: any) {
@@ -121,6 +122,35 @@ export class TournamentSocketHandlers {
         await this.roomManager.resumeTimer(roomId);
       } catch (error) {
         console.error("Error resuming timer:", error);
+      }
+    });
+
+    socket.on("tournament:get_status", async (tournamentId, callback) => {
+      try {
+        const tournament = await this.tournamentManager.getTournament(
+          tournamentId
+        );
+        if (!tournament) {
+          callback(null, "Tournament not found");
+          return;
+        }
+        callback(tournament);
+      } catch (error: any) {
+        callback(null, error.message);
+      }
+    });
+
+    socket.on("user:get_assigned_room", async (tournamentId, callback) => {
+      try {
+        const roomId = await this.roomManager.getRoomByUserId(userId);
+        if (roomId) {
+          const room = await this.roomManager.getRoom(roomId);
+          callback(room);
+        } else {
+          callback(null, "No room assigned");
+        }
+      } catch (error: any) {
+        callback(null, error.message);
       }
     });
 

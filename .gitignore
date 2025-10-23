@@ -78,4 +78,4 @@ src/serviceAccountKey.json
 **/*credentials*.json
 firebase-adminsdk-*.json
 
-tournament-example
+client-example.js
