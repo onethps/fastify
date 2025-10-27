@@ -8,7 +8,6 @@ import { authenticateConnection, extractToken } from "./socket.js";
 import { TournamentManager } from "./managers/TournamentManager.js";
 
 import { TournamentSocketHandlers } from "./TournamentHandlers.js";
-import { RoomManager } from "./managers/RoomManager.js";
 
 async function main() {
   try {
@@ -22,7 +21,6 @@ async function main() {
     const firestore = getFirestore();
 
     const tournamentManager = new TournamentManager(server.io, firestore);
-    const roomManager = new RoomManager(server.io, firestore);
 
     server.ready().then(() => {
       server.io.on("connection", async (socket) => {
@@ -39,7 +37,7 @@ async function main() {
         const handlers = new TournamentSocketHandlers(
           server.io,
           tournamentManager,
-          roomManager
+          tournamentManager.roomManager
         );
 
         handlers.registerHandlers(socket, userId);

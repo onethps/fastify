@@ -18,6 +18,14 @@ export class TimerService {
     timer: RoomTimer,
     onComplete: () => Promise<void>
   ): Promise<void> {
+    console.log(
+      `[TIMER START] Starting timer for room ${roomId} with ${timer.remaining}s`
+    );
+    console.log(
+      `[TIMER START] Existing timers before cleanup:`,
+      Array.from(this.activeTimers.keys())
+    );
+
     this.stopTimer(roomId);
 
     this.timerStates.set(roomId, {
@@ -27,21 +35,21 @@ export class TimerService {
 
     const interval = setInterval(async () => {
       const timerState = this.timerStates.get(roomId);
-
       if (!timerState || !timerState.isRunning) {
-        console.log(
-          "Timer stopped - no state or not running for room:",
-          roomId
-        );
+        console.log("Stopping timer for room:", roomId);
         this.stopTimer(roomId);
         return;
       }
 
       timerState.remaining--;
 
-      this.io.to(roomId).emit("timer:tick", roomId, timerState.remaining);
+      if (timerState.remaining > 0) {
+        this.io.to(roomId).emit("timer:tick", roomId, timerState.remaining);
 
-      if (timerState.remaining <= 0) {
+        console.log(
+          `[TIMER STATUS] Room ${roomId}: Timer tick - ${timerState.remaining}s remaining`
+        );
+      } else {
         this.stopTimer(roomId);
         await onComplete();
       }
@@ -55,13 +63,17 @@ export class TimerService {
     if (timer) {
       clearInterval(timer);
       this.activeTimers.delete(roomId);
-      console.log("Timer cleared for room:", roomId);
+      console.log(`[TIMER STOP] Timer interval cleared for room: ${roomId}`);
+    } else {
+      console.log(`[TIMER STOP] No active timer found for room: ${roomId}`);
     }
 
     if (this.timerStates.has(roomId)) {
       this.timerStates.delete(roomId);
-      console.log("Timer state cleared for room:", roomId);
+      console.log(`[TIMER STOP] Timer state cleared for room: ${roomId}`);
     }
+
+    this.io.to(roomId).emit("timer:stopped", roomId);
   }
 
   pauseTimer(roomId: string): void {

@@ -13,7 +13,7 @@ import { RoomManager } from "./RoomManager";
 export class TournamentManager extends EventEmitter {
   private io: SocketServer;
   private firestore: any;
-  private roomManager: RoomManager;
+  public roomManager: RoomManager;
   private activeTimers: Map<string, NodeJS.Timeout> = new Map();
   private connectedUsers: Set<string> = new Set();
 
@@ -207,9 +207,16 @@ export class TournamentManager extends EventEmitter {
 
     await this.updateTournament(tournament);
 
-    await this.createRound(tournament);
+    const round = await this.createRound(tournament);
 
     this.io.emit("tournament:started", tournamentId);
+
+    // Notify all participants that the tournament has started
+    for (const participantId of tournament.participants) {
+      this.io
+        .to(`user:${participantId}`)
+        .emit("tournament:participant_moved_to_room", tournamentId, round.id);
+    }
   }
 
   async createRound(tournament: Tournament): Promise<TournamentRound> {
@@ -472,6 +479,17 @@ export class TournamentManager extends EventEmitter {
     }
   }
 
+  async restetTournamentStartAt(tournamentId: string): Promise<void> {
+    const tournament = await this.getTournament(tournamentId);
+    if (!tournament) {
+      throw new Error("Tournament not found");
+    }
+    const TEN_SECONDS_IN_MILLISECONDS = 1000 * 10;
+    tournament.startAt = Date.now() + TEN_SECONDS_IN_MILLISECONDS;
+    tournament.status = TournamentStatus.CREATED;
+    await this.updateTournament(tournament);
+  }
+
   async completeTournament(
     tournamentId: string,
     winnerId: string
@@ -656,17 +674,20 @@ export class TournamentManager extends EventEmitter {
         return;
       }
 
-      const nowInSeconds = Math.floor(Date.now() / 1000);
+      const currentTime = Date.now();
+      const timeLeft = Math.floor((tournament.startAt - currentTime) / 1000);
 
-      const FIVE_MINUTES_IN_SECONDS = 10 * 20;
-      const timeLeft = Math.max(
-        0,
-        tournament.startAt + FIVE_MINUTES_IN_SECONDS - nowInSeconds
-      );
-
+      // Emit countdown to all users in the tournament
       this.io
         .to(`tournament:${tournamentId}`)
         .emit("tournament:start:timer:tick", tournamentId, timeLeft);
+
+      // Also emit to individual users who joined the tournament
+      for (const participantId of tournament.participants) {
+        this.io
+          .to(`user:${participantId}`)
+          .emit("tournament:countdown", tournamentId, timeLeft);
+      }
 
       console.log(`Timer tick for ${tournamentId}: ${timeLeft}s remaining`);
 

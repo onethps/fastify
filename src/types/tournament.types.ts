@@ -115,9 +115,6 @@ export interface ParticipantInRoom {
   status: ParticipantStatus;
 
   isOnline: boolean;
-  isMuted: boolean;
-  isCameraOn: boolean;
-  isScreenSharing: boolean;
   hasPerformed: boolean;
   hasVoted: boolean;
   performanceCompletedAt?: Date;
@@ -178,6 +175,12 @@ export interface SocketEvents {
   "tournament:created": (tournament: Tournament) => void;
   "tournament:started": (tournamentId: string) => void;
   "tournament:completed": (tournamentId: string, winnerId: string) => void;
+  "tournament:countdown": (tournamentId: string, timeLeft: number) => void;
+  "tournament:auto_started": (tournamentId: string) => void;
+  "tournament:participant_moved_to_room": (
+    tournamentId: string,
+    roundId: string
+  ) => void;
 
   "round:started": (roundData: TournamentRound) => void;
   "round:completed": (roundId: string) => void;
@@ -206,6 +209,7 @@ export interface SocketEvents {
   "timer:started": (roomId: string, timer: RoomTimer) => void;
   "timer:paused": (roomId: string) => void;
   "timer:resumed": (roomId: string) => void;
+  "timer:stopped": (roomId: string) => void;
   "timer:completed": (roomId: string) => void;
 
   "voting:started": (roomId: string) => void;

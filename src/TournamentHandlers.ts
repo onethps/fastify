@@ -46,6 +46,17 @@ export class TournamentSocketHandlers {
         callback(false, error.message);
       }
     });
+    socket.on("tournament:reset_start", async (tournamentId, callback) => {
+      try {
+        console.log("tournament:reset_start", tournamentId);
+        const success = await this.tournamentManager.restetTournamentStartAt(
+          tournamentId
+        );
+        callback(success);
+      } catch (error: any) {
+        callback(null, error.message);
+      }
+    });
 
     socket.on("tournament:create", async (data, callback) => {
       try {
@@ -86,7 +97,6 @@ export class TournamentSocketHandlers {
         callback(false);
       }
     });
-
     socket.on("media:toggle_mute", async (roomId, isMuted) => {
       await this.updateMediaState(roomId, userId, { isMuted });
     });
