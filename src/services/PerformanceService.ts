@@ -34,8 +34,8 @@ export class PerformanceService {
       id: this.roomService.generateId(),
       roomId: room.id,
       type: "preparation",
-      duration: 10,
-      remaining: 10,
+      duration: room.perparingTimerSeconds,
+      remaining: room.perparingTimerSeconds,
       isRunning: true,
       isPaused: false,
       startedAt: new Date(),
@@ -105,10 +105,6 @@ export class PerformanceService {
     if (!room) return { hasNext: false, shouldStartVoting: false };
 
     const performerId = room.currentPerformerId!;
-
-    console.log({
-      performerId,
-    });
 
     await this.roomService.updateParticipantStatus(
       roomId,

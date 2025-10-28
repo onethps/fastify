@@ -27,7 +27,7 @@ export class TournamentSocketHandlers {
         await this.tournamentManager.startTimer(tournamentId);
 
         socket.join(`tournament:${tournamentId}`);
-        socket.join(`user:${userId}`); // Join user to their personal room for targeted events
+        socket.join(`user:${userId}`);
 
         callback(true);
       } catch (error: any) {

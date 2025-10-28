@@ -133,10 +133,10 @@ export class VotingService {
 
     await this.roomService.updateRoom(room);
 
-    console.log(`[VOTING STATUS] Room ${roomId}: Voting completed`);
     this.io.to(roomId).emit("voting:completed", roomId);
 
     const result = await this.calculateResults(roomId);
+
     return result;
   }
 
@@ -253,11 +253,14 @@ export class VotingService {
     const winners: string[] = [];
     for (let i = 0; i < Math.min(advanceCount, scores.length); i++) {
       const score = scores[i];
+      console.log("score", score);
       if (score) {
         score.advancesToNextRound = true;
         winners.push(score.userId);
       }
     }
+
+    console.log("winners", winners);
 
     room.scores = scores;
     room.winners = winners;

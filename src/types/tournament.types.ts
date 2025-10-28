@@ -42,6 +42,7 @@ export interface Tournament {
 
   maxParticipantsPerRoom: number;
   performanceTimeSeconds: number;
+  perparingTimerSeconds: number;
   votingTimeSeconds: number;
   advancePerRoom: number;
 
@@ -88,6 +89,7 @@ export interface TournamentRoom {
   createdAt: Date;
   startedAt?: Date;
   completedAt?: Date;
+  perparingTimerSeconds: number;
 }
 
 export interface RoomTimer {

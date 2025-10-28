@@ -21,10 +21,6 @@ export class TimerService {
     console.log(
       `[TIMER START] Starting timer for room ${roomId} with ${timer.remaining}s`
     );
-    console.log(
-      `[TIMER START] Existing timers before cleanup:`,
-      Array.from(this.activeTimers.keys())
-    );
 
     this.stopTimer(roomId);
 

@@ -109,6 +109,7 @@ export class TournamentManager extends EventEmitter {
     performanceTimeSeconds?: number;
     votingTimeSeconds?: number;
     advancePerRoom?: number;
+    perparingTimerSeconds?: number;
     startAt?: number;
   }): Promise<Tournament> {
     const tournament: Tournament = {
@@ -121,6 +122,7 @@ export class TournamentManager extends EventEmitter {
       performanceTimeSeconds: data.performanceTimeSeconds || 60,
       votingTimeSeconds: data.votingTimeSeconds || 20,
       advancePerRoom: data.advancePerRoom || 2,
+      perparingTimerSeconds: data.perparingTimerSeconds || 10,
 
       currentRound: 0,
       totalRounds: 0,
@@ -268,15 +270,11 @@ export class TournamentManager extends EventEmitter {
     const rooms: TournamentRoom[] = [];
     const maxPerRoom = tournament.maxParticipantsPerRoom;
 
-    console.log("createRoomsForRound");
-
     const shuffled = this.shuffleArray([...participants]);
 
     let roomNumber = 1;
     for (let i = 0; i < shuffled.length; i += maxPerRoom) {
       const roomParticipants = shuffled.slice(i, i + maxPerRoom);
-
-      console.log("roomParticipants");
 
       const room: TournamentRoom = {
         id: this.generateId(),
@@ -290,6 +288,7 @@ export class TournamentManager extends EventEmitter {
         participantIds: roomParticipants,
         performanceOrder: this.shuffleArray([...roomParticipants]),
         currentPerformanceIndex: 0,
+        perparingTimerSeconds: tournament.perparingTimerSeconds,
 
         timer: {
           id: this.generateId(),
@@ -342,8 +341,6 @@ export class TournamentManager extends EventEmitter {
         }
       }
     }
-
-    console.log("after createRoomsForRound");
 
     return rooms;
   }

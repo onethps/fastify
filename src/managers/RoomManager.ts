@@ -183,6 +183,7 @@ export class RoomManager extends EventEmitter {
 
     if (result.allVoted) {
       this.timerService.stopTimer(roomId);
+      await this.votingService.autoScoreMissingVotes(roomId);
       await this.votingService.handleVotingComplete(roomId);
       this.emit("room:completed", roomId);
     }
